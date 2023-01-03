@@ -2,9 +2,15 @@ const express = require("express");
 const bcrypt = require("bcrypt");
 const validator = require("validator");
 const mongoose = require("mongoose");
+const Jwt = require("jsonwebtoken");
 const session = require("express-session");
+
 const mongoDBSession = require("connect-mongodb-session")(session);
-const { cleanUpAndValidate } = require("./utils/AuthUtils");
+const {
+  cleanUpAndValidate,
+  sendVerificationEmail,
+  jwtSign,
+} = require("./utils/AuthUtils");
 const UserSchema = require("./UserSchema");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -74,7 +80,7 @@ app.get("/register", (req, res) => {
 
 app.post("/register", async (req, res) => {
   const { name, username, password, email } = req.body;
-  console.log(req.body);
+
   // Validation of Data
   try {
     await cleanUpAndValidate({ name, username, password, email });
@@ -93,7 +99,7 @@ app.post("/register", async (req, res) => {
     username: username,
     password: hashedPassword,
     email,
-    email,
+    emailAuthenticated: false,
   });
 
   let userExists;
@@ -114,11 +120,18 @@ app.post("/register", async (req, res) => {
       message: "User with email already exists",
     });
 
+  //generate and send email verification token
+
+  const verficationToken = jwtSign(email);
+  console.log(verficationToken);
   try {
     const userDb = await user.save(); // Create Operation
+    sendVerificationEmail(email, verficationToken);
+
     return res.send({
       status: 200,
-      message: "Registration Successful",
+      message:
+        "Verification mail has been send to you mail ID. Please verify before login",
       data: {
         _id: userDb._id,
         username: userDb.username,
@@ -132,6 +145,33 @@ app.post("/register", async (req, res) => {
       error: err,
     });
   }
+});
+
+app.get("/verifyEmail/:verificationToken", async (req, res) => {
+  const token = req.params.verificationToken;
+  console.log(token);
+  Jwt.verify(token, "backendnodejs", async (err, verifiedJwt) => {
+    if (err) {
+      res.send(err);
+    } else {
+      // console.log(verifiedJwt.email);
+      // return res.status(200).redirect("/login");
+
+      const userdb = await UserSchema.findOneAndUpdate(
+        { email: verifiedJwt.email },
+        { emailAuthenticated: true }
+      );
+
+      if (userdb) {
+        return res.status(200).redirect("/login");
+      } else {
+        return res.send({
+          status: 400,
+          message: "User not found. Invalid Session link",
+        });
+      }
+    }
+  });
 });
 
 app.post("/login", async (req, res) => {
@@ -175,6 +215,13 @@ app.post("/login", async (req, res) => {
       status: 400,
       message: "User not found",
       data: req.body,
+    });
+  }
+
+  if (userDb.emailAuthenticated === false) {
+    return res.send({
+      status: 400,
+      message: "Please verified your mail id",
     });
   }
 

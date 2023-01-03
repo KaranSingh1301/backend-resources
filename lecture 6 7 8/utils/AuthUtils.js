@@ -1,5 +1,6 @@
+const Jwt = require("jsonwebtoken");
 const validator = require("validator");
-
+const nodemailer = require("nodemailer");
 const cleanUpAndValidate = ({ name, password, email, username }) => {
   return new Promise((resolve, reject) => {
     if (typeof email != "string") reject("Invalid Email");
@@ -23,4 +24,38 @@ const cleanUpAndValidate = ({ name, password, email, username }) => {
   });
 };
 
-module.exports = { cleanUpAndValidate };
+const jwtSign = (email) => {
+  const JWT_TOKEN = Jwt.sign({ email: email }, "backendnodejs", {
+    expiresIn: "15d",
+  });
+  return JWT_TOKEN;
+};
+
+const sendVerificationEmail = (email, verficationToken) => {
+  console.log(email, verficationToken);
+  let mailer = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true,
+    service: "Gmail",
+    auth: {
+      user: "kssinghkaran13@gmail.com",
+      pass: "mqfbwhneeoowihig",
+    },
+  });
+
+  let sender = "Todo App";
+  let mailOptions = {
+    from: sender,
+    to: email,
+    subject: "Email Verification Todo App",
+    html: `Press <a href=http://localhost:8000/verifyEmail/${verficationToken}> here </a> to verify your account.`,
+  };
+
+  mailer.sendMail(mailOptions, function (error, response) {
+    if (error) console.log(error);
+    else console.log("Mail sent successfully");
+  });
+};
+
+module.exports = { cleanUpAndValidate, jwtSign, sendVerificationEmail };

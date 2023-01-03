@@ -86,6 +86,3 @@ server.listen(8000);
 //     }
 //   })
 //   .listen(8000);
-
-//https://nodejs.org/api/fs.html
-//https://pqina.nl/blog/upload-image-with-nodejs/
